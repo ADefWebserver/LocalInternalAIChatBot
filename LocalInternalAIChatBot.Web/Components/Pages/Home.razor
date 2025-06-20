@@ -1,0 +1,20 @@
+﻿@rendermode InteractiveServer
+@page "/"
+@inject EmbeddingsService embeddingsService
+
+<PageTitle>Home</PageTitle>
+
+<h1>Home</h1>
+
+<p>fEmbedding count: @fEmbedding.Count()</p>
+
+<button class="btn btn-primary" @onclick="CreateEmbedding">Create Embedding</button>
+
+@code {
+    private float[] fEmbedding = new float[0];
+
+    private async Task CreateEmbedding()
+    {
+        fEmbedding = await embeddingsService.GetEmbeddingAsync("This is a test string for embedding.");
+    }
+}
