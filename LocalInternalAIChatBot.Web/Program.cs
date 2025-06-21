@@ -1,5 +1,7 @@
 using LocalInternalAIChatBot.Web;
 using LocalInternalAIChatBot.Web.Components;
+using LocalInternalAIChatBot.Web.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,15 +12,6 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-
-builder.Services.AddOutputCache();
-
-builder.Services.AddHttpClient<WeatherApiClient>(client =>
-    {
-        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
-        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
-        client.BaseAddress = new("https+http://apiservice");
-    });
 
 // Ollama API client configuration.
 builder.AddOllamaApiClient("chat")
@@ -31,7 +24,10 @@ builder.AddOllamaApiClient("chat")
 builder.Services.AddHttpClient<EmbeddingsService>(client =>
 {
     client.BaseAddress = new("http://localhost:11434");
-}); 
+});
+
+builder.Services.AddDbContext<LocalInternalAIChatBotContext>(opts =>
+  opts.UseSqlServer(builder.Configuration.GetConnectionString("dbConnectionString")));
 
 var app = builder.Build();
 
@@ -45,8 +41,6 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
-
-app.UseOutputCache();
 
 app.MapStaticAssets();
 

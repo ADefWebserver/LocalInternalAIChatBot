@@ -12,7 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LocalInternalAIChatBot.ApiService\LocalInternalAIChatBot.ApiService.csproj" />
     <ProjectReference Include="..\LocalInternalAIChatBot.Web\LocalInternalAIChatBot.Web.csproj" />
   </ItemGroup>
 
