@@ -16,7 +16,7 @@ builder.AddProject<Projects.LocalInternalAIChatBot_Web>("webfrontend")
     .WithReference(ollama)
     .WithReference(chat)
     .WithReference(embeddings)
-    .WithReference(dbConnectionString) // Use the correctly casted reference
+    .WithReference(dbConnectionString)
     .WaitFor(chat)
     .WaitFor(embeddings);
 

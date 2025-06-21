@@ -3,6 +3,7 @@ using LocalInternalAIChatBot.Web.Components;
 using LocalInternalAIChatBot.Web.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,8 @@ builder.Services.AddHttpClient<EmbeddingsService>(client =>
 
 builder.Services.AddDbContext<LocalInternalAIChatBotContext>(opts =>
   opts.UseSqlServer(builder.Configuration.GetConnectionString("dbConnectionString")));
+
+builder.Services.AddRadzenComponents();
 
 var app = builder.Build();
 
