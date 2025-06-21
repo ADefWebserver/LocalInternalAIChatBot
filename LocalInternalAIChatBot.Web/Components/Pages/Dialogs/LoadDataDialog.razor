@@ -1,0 +1,32 @@
+﻿@rendermode InteractiveServer
+@using LocalInternalAIChatBot.Models.DTO
+@inject DialogService DialogService
+<div class="row">
+    <div class="col-md-12">
+        <RadzenTextBox Placeholder="Article Title" @bind-Value="@article.Title" 
+        Style="width:100%" />
+    </div>
+</div>
+<br />
+<div class="row">
+    <div class="col-md-12">
+        <RadzenTextArea Placeholder="Article Contents" @bind-Value="@article.Contents" 
+        Style="height: 300px; width:100%" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <RadzenButton Text="Submit" ButtonStyle="ButtonStyle.Success" Click="@Submit" />
+    </div>
+</div>
+
+@code {
+
+    ArticleDTO article = new ArticleDTO();
+
+    void Submit()
+    {
+        // Pass the article back to the page that opened this dialog
+        DialogService.Close(article);
+    }
+}

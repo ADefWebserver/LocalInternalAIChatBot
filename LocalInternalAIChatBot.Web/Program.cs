@@ -1,3 +1,4 @@
+using LocalInternalAIChatBot.Data;
 using LocalInternalAIChatBot.Web;
 using LocalInternalAIChatBot.Web.Components;
 using LocalInternalAIChatBot.Web.Models;
@@ -14,6 +15,9 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register the ChatSQLVectorService service
+builder.Services.AddScoped<ChatSQLVectorService>();
+
 // Ollama API client configuration.
 builder.AddOllamaApiClient("chat")
     .AddChatClient()
@@ -28,7 +32,7 @@ builder.Services.AddHttpClient<EmbeddingsService>(client =>
 });
 
 builder.Services.AddDbContext<LocalInternalAIChatBotContext>(opts =>
-  opts.UseSqlServer(builder.Configuration.GetConnectionString("dbConnectionString")));
+  opts.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddRadzenComponents();
 

@@ -1,0 +1,224 @@
+﻿@rendermode InteractiveServer
+@page "/ragchat"
+@using Azure;
+@using System.Text.RegularExpressions;
+@using LocalInternalAIChatBot.Data
+@using LocalInternalAIChatBot.Models.DTO
+@using LocalInternalAIChatBot.Web.Components.Pages.Dialogs
+@using LocalInternalAIChatBot.Web.Models
+@inject IConfiguration _configuration
+@inject DialogService dialogService
+@inject EmbeddingsService embeddingsService
+@inherits OwningComponentBase<ChatSQLVectorService>
+<PageTitle>RagChat</PageTitle>
+<h1>Data</h1>
+<RadzenButton Text="Load Data" ButtonStyle="ButtonStyle.Success"
+              Click=@OpenLoadDataDialog />
+<br />
+@if (Status != "")
+{
+    <br />
+    <p style="color:red">@Status</p>
+}
+<br />
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenDataGrid Data="@articles" TItem="Article" AllowPaging="true" PageSize="10">
+    <Columns>
+        <!-- Action column -->
+        <RadzenDataGridColumn TItem="Article" Context="article" Title="" Width="20%">
+            <Template Context="article">
+                <RadzenButton Icon="delete"
+                              Text="Delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Click="@(args => Delete(article))" />
+            </Template>
+        </RadzenDataGridColumn>
+
+        <!-- Article name -->
+        <RadzenDataGridColumn TItem="Article"
+                              Property="ArticleName"
+                              Title="Article Name" />
+
+        <!-- Number of chunks -->
+        <RadzenDataGridColumn TItem="Article"
+                              Property="ArticleDetail.Count"
+                              Title="Number of Chunks"
+                              Width="20%" />
+    </Columns>
+</RadzenDataGrid>
+@code {
+#nullable disable
+    string Status = "";
+    private List<Article> articles;
+
+    string Endpoint = "";
+    string DeploymentOrModelName = "";
+    string Key = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the articles from the database
+        articles = await @Service.GetArticlesAsync();
+    }
+
+    public async Task OpenLoadDataDialog()
+    {
+        Status = "";
+
+        try
+        {
+            // Show the Load Data dialog
+            var result = await dialogService.OpenAsync<LoadDataDialog>(
+            $"Load Data",
+            null,
+            new DialogOptions()
+            {
+                Width = "700px",
+                Height = "512px",
+                Resizable = true,
+                Draggable = true
+            });
+
+            // Get the article from the dialog
+            var article = (ArticleDTO)result;
+
+            // Check that article contains data
+            if ((article.Title.Trim() != "") && (article.Contents.Trim() != ""))
+            {
+                // Split the article into chunks
+                var ArticleChuks = SplitTextIntoChunks(article.Contents.Trim(), 200);
+
+                // Create Article object
+                var objNewArticle = new Article();
+                objNewArticle.ArticleName = article.Title;
+
+                // Add article to database
+                var InsertArticle = await @Service.AddArticleAsync(objNewArticle);
+
+                // Add article details to database
+                foreach (var chunk in ArticleChuks)
+                {
+                    // Update the status
+                    Status =
+                $"Creating chunk {ArticleChuks.IndexOf(chunk) + 1} of {ArticleChuks.Count}";
+
+                    StateHasChanged();
+
+                    // Get embeddings for the chunk
+                    var embeddings = await embeddingsService.GetEmbeddingAsync(chunk);
+
+                    // Create ArticleDetail object
+                    var objNewArticleDetail = new ArticleDetail();
+                    objNewArticleDetail.Article = InsertArticle;
+                    objNewArticleDetail.ArticleContent = chunk;
+                    objNewArticleDetail.ArticleSequence = ArticleChuks.IndexOf(chunk) + 1;
+
+                    // Add article detail to database
+                    var InsertArticleDetail =
+                await @Service.AddArticleDetailAsync(objNewArticleDetail, embeddings);
+                }
+
+                // Refresh the grid
+                Status = "";
+                StateHasChanged();
+
+                // Get the articles from the database
+                articles = await @Service.GetArticlesAsync();
+
+                // Show a success dialog
+                await dialogService.Alert(
+                "Article added to database",
+                "Success",
+                new AlertOptions() { OkButtonText = "Ok" });
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = ex.Message;
+        }
+    }
+
+    public async Task Delete(Article article)
+    {
+        // Show a custom dialog before deleting
+        var result = await dialogService.OpenAsync("Delete article", ds =>
+    @<RadzenCard Style="padding: 20px;">
+            <p Style="margin-bottom: 10px;">Are you sure you want to delete this article?</p>
+            <div class="row">
+                <div class="col-md-12">
+                    <RadzenButton Text="Yes"
+                                  Click="() => ds.Close(true)"
+                                  ButtonStyle="ButtonStyle.Danger"
+                                  Style="margin-bottom: 10px; width: 150px" />
+                    <RadzenButton Text="No"
+                                  Click="() => ds.Close(false)"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Style="margin-bottom: 10px; width: 150px" />
+                </div>
+            </div>
+        </RadzenCard>,
+        new DialogOptions() { Width = "600px", Height = "220px" });
+        if (result)
+        {
+            // Delete the article from the database
+            var deleteresult = await @Service.DeleteArticleAsync(article.Id);
+            articles = await @Service.GetArticlesAsync();
+        }
+    }
+
+    // The method that splits the text into chunks of a given size
+    public static List<string> SplitTextIntoChunks(string text, int chunkSize)
+    {
+        // Initialize an empty list to store the chunks
+        List<string> chunks = new List<string>();
+
+        // Fix up text
+        var NormalizedText = NormalizeText(text);
+
+        // Split the text by whitespace characters
+        string[] words = NormalizedText.Split();
+
+        // Loop through the words and add them to the current chunk
+        string currentChunk = "";
+        foreach (string word in words)
+        {
+            // If adding the word would exceed the chunk size,
+            // add the current chunk to the list and start a new one
+            if (currentChunk.Length + word.Length + 1 > chunkSize)
+            {
+                chunks.Add(currentChunk);
+                currentChunk = "";
+            }
+
+            // Add the word to the current chunk with a space
+            currentChunk += word + " ";
+        }
+
+        // Add the last chunk to the list if it is not empty
+        if (currentChunk != "")
+        {
+            chunks.Add(currentChunk);
+        }
+
+        // Return the list of chunks
+        return chunks;
+    }
+
+    public static string NormalizeText(string s, string sepToken = " \n ")
+    {
+        // Replace multiple whitespace with single space and trim
+        s = Regex.Replace(s, @"\s+", " ").Trim();
+        // Remove all instances of ". ,"
+        s = Regex.Replace(s, @". ,", "");
+        // Remove all instances of multiple dots
+        s = s.Replace("..", ".");
+        s = s.Replace(". .", ".");
+        // Remove all instances of multiple commas
+        s = s.Replace("\n", "");
+        s = s.Trim();
+
+        return s;
+    }
+}
