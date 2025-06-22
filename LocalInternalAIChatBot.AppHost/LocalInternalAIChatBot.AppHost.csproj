@@ -16,8 +16,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="9.3.2" />
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.1" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="9.3.2" />
 	<PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="9.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="!SQL\01.00.00.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -39,7 +39,7 @@ builder.Services.AddHttpClient<EmbeddingsService>(client =>
 
 // Register the DbContext with SQL Server
 builder.Services.AddDbContext<LocalInternalAIChatBotContext>(opts =>
-  opts.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+  opts.UseSqlServer(builder.Configuration.GetConnectionString("LocalInternalAIChatBot")));
 
 // Register the Radzen
 builder.Services.AddRadzenComponents();
