@@ -1,20 +1,326 @@
 ﻿@rendermode InteractiveServer
 @page "/"
+@using Azure;
+@using System.Text.RegularExpressions;
+@using LocalInternalAIChatBot
+@using LocalInternalAIChatBot.Models.DTO
+@using LocalInternalAIChatBot.Web.Components.Pages.Dialogs
+@using LocalInternalAIChatBot.Web.Models
+@using LocalInternalAIChatBot.Web.Models.DTO
+@using Markdig;
+@using Microsoft.Extensions.AI
+@inject IJSRuntime _jsRuntime
+@inject IConfiguration _configuration
+@inject NotificationService NotificationService
+@inject DialogService dialogService
 @inject EmbeddingsService embeddingsService
+@inject ChatService chatService
+@inherits OwningComponentBase<ChatSQLVectorService>
+<PageTitle>Index</PageTitle>
 
-<PageTitle>Home</PageTitle>
+<h1>Local ChatBot</h1>
 
-<h1>Home</h1>
+<RadzenTabs @bind-SelectedIndex="selectedTab" RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <!-- Chat Tab -->
+        <RadzenTabsItem Text="Chat" Icon="chat">
+            <!-- Scrollable message container -->
+            <RadzenCard Style="height:550px; overflow:auto; margin-bottom:16px">
+                @foreach (var item in ChatMessageDTOs)
+                {
+                    @if (item.role == ChatRole.User)
+                    {
+                        <div class="d-flex justify-content-end mb-2">
+                            <RadzenBadge Text="Human" />
+                        </div>
+                        <div class="d-flex justify-content-end mb-2">
+                            @((MarkupString)item.content.ToHtml())
+                        </div>
+                    }
+                    else if (item.role == ChatRole.Assistant)
+                    {
+                        <div class="d-flex justify-content-start mb-2">
+                            <RadzenBadge Text="ChatBot" />
+                        </div>
+                        <div class="assistant-role msg">
+                            @((MarkupString)item.content.ToHtml())
+                        </div>
+                    }
+                }
+            </RadzenCard>
 
-<p>fEmbedding count: @fEmbedding.Count()</p>
+            @if (!Processing)
+            {
+                <RadzenTextArea @bind-Value="prompt" Rows="3" Style="width:100%" />
+                <div class="mt-2">
+                    <RadzenButton Text="Call ChatBot"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Click="CallSearchData" />
+                    <RadzenButton Text="Restart"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Click="RestartChatGPT"
+                                  Style="margin-left:8px" />
+                </div>
+            }
+            else
+            {
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width:100%; margin-top:16px" />
+            }
+        </RadzenTabsItem>
+        <!-- Search Results Tab -->
+        <RadzenTabsItem Text="Search Results" Icon="search">
+            <RadzenDataGrid Data="@similarities"
+                            TItem="ArticleResultsDTO"
+                            AllowFiltering="true"
+                            AllowSorting="true"
+                            AllowPaging="true"
+                            PageSize="10">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ArticleResultsDTO"
+                                          Property="Article"
+                                          Title="Article"
+                                          Width="30%" />
+                    <RadzenDataGridColumn TItem="ArticleResultsDTO"
+                                          Property="Sequence"
+                                          Title="#"
+                                          Width="10%" />
+                    <RadzenDataGridColumn TItem="ArticleResultsDTO"
+                                          Property="Contents"
+                                          Title="Content">
+                        <Template Context="data">
+                            <p style="white-space:pre-wrap">@data.Contents</p>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ArticleResultsDTO"
+                                          Property="Match"
+                                          Title="%"
+                                          FormatString="{0:P}"
+                                          Width="10%" />
+                    <RadzenDataGridColumn TItem="ArticleResultsDTO"
+                                          Title=""
+                                          Width="80px">
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
 
-<button class="btn btn-primary" @onclick="CreateEmbedding">Create Embedding</button>
-
+<br /><p style="color:red">@ErrorMessage</p>
 @code {
-    private float[] fEmbedding = new float[0];
+    string Endpoint = "";
+    string DeploymentOrModelName = "";
+    string Key = "";
 
-    private async Task CreateEmbedding()
+    List<ChatMessageDTO> ChatMessageDTOs = new List<ChatMessageDTO>();
+    string prompt = "";
+    string ErrorMessage = "";
+    bool Processing = false;
+    int selectedTab = 0;
+
+    // Declare an embedding collection and a list to store similarities
+    List<ArticleResultsDTO> similarities = new List<ArticleResultsDTO>();
+
+    protected override void OnInitialized()
     {
-        fEmbedding = await embeddingsService.GetEmbeddingAsync("This is a test string for embedding.");
+        RestartChatGPT();
     }
+
+    protected override async Task
+    OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await _jsRuntime.InvokeAsync<string>(
+                "ScrollToBottom", "chatcontainer"
+            );
+        }
+        catch
+        {
+            // do nothing if this fails
+        }
+    }
+
+    void RestartChatGPT()
+    {
+        ErrorMessage = "";
+        prompt = "How can I bring my own data to Azure OpenAI?";
+
+        ChatMessageDTOs = new List<ChatMessageDTO>();
+       
+        StateHasChanged();
+    }
+
+    async Task CallSearchData()
+    {
+        // Set the in-progress flag to true
+        Processing = true;
+
+        // Notify the framework that the state has changed and the UI should be updated
+        StateHasChanged();
+
+        try
+        {
+            similarities.Clear();
+
+            // Get embeddings for the chunk
+            var embeddings = await embeddingsService.GetEmbeddingAsync(prompt);
+
+            // Loop through the embeddings
+            List<VectorData> AllVectors = new List<VectorData>();
+            for (int i = 0; i < embeddings.Length; i++)
+            {
+                var embeddingVector = new VectorData
+                {
+                    VectorValue = embeddings[i]
+                };
+
+                AllVectors.Add(embeddingVector);
+            }
+
+            // Convert the floats to a single string to pass to the function
+            var VectorsForSearchText =
+            "[" + string.Join(",", AllVectors.Select(x => x.VectorValue)) + "]";
+
+            // Call the SQL function to get the similar content articles
+            var SimularContentArticles =
+            @Service.GetSimilarContentArticles(VectorsForSearchText);
+
+            // Loop through SimularContentArticles
+            foreach (var Article in SimularContentArticles)
+            {
+                // Add to similarities collection
+                similarities.Add(
+                    new ArticleResultsDTO()
+                    {
+                        Article = Article.ArticleName,
+                        Sequence = Article.ArticleSequence,
+                        Contents = Article.ArticleContent,
+                        Match = Article.cosine_distance ?? 0
+                    }
+                    );
+            }
+
+            // Sort the results by similarity in descending order
+            similarities.Sort((a, b) => b.Match.CompareTo(a.Match));
+
+            // Take the top 10 results
+            similarities = similarities.Take(10).ToList();
+
+            // Sort by the first colum then the second column
+            similarities.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
+            similarities.Sort((a, b) => a.Article.CompareTo(b.Article));
+
+            // Call Azure OpenAI API
+            await CallChatGPT();
+        }
+        catch (Exception ex)
+        {
+            // Create an error notification message
+            var Notification = new NotificationMessage()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = ex.Message,
+                Duration = 40000
+            };
+
+            // Show the notification
+            NotificationService.Notify(Notification);
+
+            // Set the in-progress flag to false
+            Processing = false;
+
+            // Notify the framework that the state has changed
+            // and the UI should be updated
+            StateHasChanged();
+        }
+    }
+
+    async Task CallChatGPT()
+    {
+        Processing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Step 1: Build knowledge base
+            string ExistingKnowledge = string.Join(" ", similarities.Select(item =>
+                $"#Article: {item.Article} #Article Contents: {item.Contents}"));
+
+            // Step 2: Add user message
+            ChatMessageDTOs.Add(new ChatMessageDTO(ChatRole.User, prompt));
+
+            // Step 3: Add placeholder assistant message
+            var assistantMessage = new ChatMessageDTO(ChatRole.Assistant, "");
+            ChatMessageDTOs.Add(assistantMessage);
+            StateHasChanged(); // Render placeholder
+
+            // Step 4: Call the chat service to get the response
+            string SystemMessage = "You are helpful Assistant.";
+            SystemMessage += "You will always reply with a Markdown formatted response.";
+            SystemMessage += "You will always include the source name for each knowledge you use in the answer.";
+
+            string ChatBotPrompt = $"###System Message:\n{SystemMessage}\n\n##Question:\n{prompt}\n\n##Instruction:\n{GetInstruction(ExistingKnowledge)}";
+
+            await chatService.GetChatResponseAsync(ChatBotPrompt, async chunk =>
+            {
+                assistantMessage.content += chunk;
+                await InvokeAsync(StateHasChanged); // Notify Blazor of changes
+            });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = ex.Message,
+                Duration = 40000
+            });
+        }
+
+        Processing = false;
+        prompt = "";
+        StateHasChanged();
+    }
+
+    public string GetInstruction(string Knowledge)
+    {
+        string instruction = $@"
+        Answer questions using the given knowledge ONLY.
+        For tabular information return it as an HTML table.
+        Always return markdown format.
+        Each knowledge has a #Article: source name and an #Article Contents: with the actual information
+        Do not return the ##Knowledge: section only return the ##Answer: section
+        Always include the source name for each knowledge you use in the answer.
+        Don't cite knowledge that is not available in the knowledge list.
+        If you cannot answer using the knowledge list only, say you don't know.
+
+        You have this knowledge available: {Knowledge}
+
+        ### EXAMPLE 1
+        Question: 'What Microsoft Blazor?'
+
+        ##Knowledge:
+        #Article: Blazor One #Article Contents: Blazor allows you to build web apps.
+        #Article: Blazor One #Article Contents: Both client and server code is written in C#, allowing you to share code and libraries.
+        #Article: Blazor Two #Article Contents: It uses C# instead of JavaScript allowing you to share code and libraries.
+
+        ##Answer:
+        Blazor apps are composed of reusable web UI components implemented using C#, HTML, and CSS.
+        Both client and server code is written in C#, allowing you to share code and libraries.
+
+        References: [Blazor One], [Blazor Two]
+
+        ### EXAMPLE 2
+        Question: 'What happens in a performance review'
+
+        ##Knowledge:
+
+        ##Answer:
+        I don't know
+        ###";
+        return instruction.Trim();
+    }    
 }

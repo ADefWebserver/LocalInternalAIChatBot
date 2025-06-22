@@ -2,7 +2,6 @@
 @page "/ragchat"
 @using Azure;
 @using System.Text.RegularExpressions;
-@using LocalInternalAIChatBot.Data
 @using LocalInternalAIChatBot.Models.DTO
 @using LocalInternalAIChatBot.Web.Components.Pages.Dialogs
 @using LocalInternalAIChatBot.Web.Models
@@ -102,7 +101,7 @@
                 {
                     // Update the status
                     Status =
-                $"Creating chunk {ArticleChuks.IndexOf(chunk) + 1} of {ArticleChuks.Count}";
+                    $"Creating chunk {ArticleChuks.IndexOf(chunk) + 1} of {ArticleChuks.Count}";
 
                     StateHasChanged();
 

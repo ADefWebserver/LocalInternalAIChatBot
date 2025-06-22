@@ -3,7 +3,7 @@ using LocalInternalAIChatBot.Web.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 
-namespace LocalInternalAIChatBot.Data
+namespace LocalInternalAIChatBot
 {
     public class ChatSQLVectorService
     {

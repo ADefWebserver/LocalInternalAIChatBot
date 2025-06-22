@@ -1,31 +1,35 @@
 ﻿using OllamaSharp;
 using OllamaSharp.Models;
 using System.Text.Json;
-public class EmbeddingsService(HttpClient _httpClient)
+
+namespace LocalInternalAIChatBot
 {
-    public async Task<float[]> GetEmbeddingAsync(string prompt)
+    public class EmbeddingsService(HttpClient _httpClient)
     {
-        string _model = "all-minilm";
-
-        var request = new
+        public async Task<float[]> GetEmbeddingAsync(string prompt)
         {
-            model = _model,
-            prompt = prompt
-        };
+            string _model = "all-minilm";
 
-        var response = await _httpClient.PostAsJsonAsync("/api/embeddings", request);
+            var request = new
+            {
+                model = _model,
+                prompt = prompt
+            };
 
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"Embedding request failed: {response.StatusCode}");
+            var response = await _httpClient.PostAsJsonAsync("/api/embeddings", request);
 
-        using var contentStream = await response.Content.ReadAsStreamAsync();
-        using var jsonDoc = await JsonDocument.ParseAsync(contentStream);
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Embedding request failed: {response.StatusCode}");
 
-        var root = jsonDoc.RootElement;
+            using var contentStream = await response.Content.ReadAsStreamAsync();
+            using var jsonDoc = await JsonDocument.ParseAsync(contentStream);
 
-        if (!root.TryGetProperty("embedding", out var embeddingElement))
-            throw new Exception("Missing 'embedding' in response.");
+            var root = jsonDoc.RootElement;
 
-        return embeddingElement.EnumerateArray().Select(e => e.GetSingle()).ToArray();
+            if (!root.TryGetProperty("embedding", out var embeddingElement))
+                throw new Exception("Missing 'embedding' in response.");
+
+            return embeddingElement.EnumerateArray().Select(e => e.GetSingle()).ToArray();
+        }
     }
 }

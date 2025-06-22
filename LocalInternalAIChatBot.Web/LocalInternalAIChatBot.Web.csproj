@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.KernelMemory.AI.Ollama" Version="0.98.250508.3" />
     <PackageReference Include="OllamaSharp" Version="5.2.2" />
     <PackageReference Include="Radzen.Blazor" Version="7.1.1" />
+	<PackageReference Include="Markdig" Version="0.31.0" />
   </ItemGroup>
 
   <ItemGroup>

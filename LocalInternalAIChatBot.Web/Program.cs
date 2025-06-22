@@ -1,4 +1,4 @@
-using LocalInternalAIChatBot.Data;
+using LocalInternalAIChatBot;
 using LocalInternalAIChatBot.Web;
 using LocalInternalAIChatBot.Web.Components;
 using LocalInternalAIChatBot.Web.Models;
@@ -25,15 +25,23 @@ builder.AddOllamaApiClient("chat")
     .UseOpenTelemetry(configure: c =>
         c.EnableSensitiveData = builder.Environment.IsDevelopment());
 
-// Ollama embeddings service configuration.
+// Ollama service configuration.
+builder.Services.AddHttpClient<ChatService>(client =>
+{
+    client.BaseAddress = new("http://localhost:11434");
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+
 builder.Services.AddHttpClient<EmbeddingsService>(client =>
 {
     client.BaseAddress = new("http://localhost:11434");
 });
 
+// Register the DbContext with SQL Server
 builder.Services.AddDbContext<LocalInternalAIChatBotContext>(opts =>
   opts.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Register the Radzen
 builder.Services.AddRadzenComponents();
 
 var app = builder.Build();
