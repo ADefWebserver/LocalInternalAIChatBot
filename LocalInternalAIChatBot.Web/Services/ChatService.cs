@@ -23,7 +23,12 @@ namespace LocalInternalAIChatBot
                 {
                     new { role = "user", content = chatprompt }
                 },
-                stream = true
+                stream = true,
+                options = new
+                {
+                    temperature = 0.7,
+                    num_ctx = 2048
+                }
             };
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
