@@ -25,8 +25,8 @@ var db = sqlServer.AddDatabase("LocalInternalAIChatBot")
 // Add Ollma container for AI models
 var ollama = builder.AddOllama("ollama", 11434) // Ollama default port
     .WithDataVolume()
-    .WithLifetime(ContainerLifetime.Persistent); 
-    //.WithContainerRuntimeArgs("--gpus=all");
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WithContainerRuntimeArgs("--gpus=all");
 
 var chat = ollama.AddModel("chat", "phi3.5");
 var embeddings = ollama.AddModel("embeddings", "all-minilm");
