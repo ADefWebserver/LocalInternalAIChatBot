@@ -140,7 +140,7 @@
     void RestartChatGPT()
     {
         ErrorMessage = "";
-        prompt = "How can I bring my own data to Azure OpenAI?";
+        prompt = "How can I scale Azure Container Apps?";
 
         ChatMessageDTOs = new List<ChatMessageDTO>();
        
@@ -255,7 +255,6 @@
             // Step 4: Call the chat service to get the response
             string SystemMessage = "You are helpful Assistant.";
             SystemMessage += "You will always reply with a Markdown formatted response.";
-            SystemMessage += "You will always include the source name for each knowledge you use in the answer.";
 
             string ChatBotPrompt = $"###System Message:\n{SystemMessage}\n\n##Question:\n{prompt}\n\n##Instruction:\n{GetInstruction(ExistingKnowledge)}";
 
@@ -284,16 +283,18 @@
     public string GetInstruction(string Knowledge)
     {
         string instruction = $@"
-        Answer questions using the given knowledge ONLY.
-        For tabular information return it as an HTML table.
-        Always return markdown format.
-        Each knowledge has a #Article: source name and an #Article Contents: with the actual information
-        Do not return the ##Knowledge: section only return the ##Answer: section
-        Always include the source name for each knowledge you use in the answer.
-        Don't cite knowledge that is not available in the knowledge list.
-        If you cannot answer using the knowledge list only, say you don't know.
+        #1 Answer questions using the given knowledge ONLY.
+        #2 Each knowledge has a #Article: source name and an #Article Contents: with the actual information
+        #3 Do not return the ##Knowledge: section only return the contents of the ##Answer: section
+        #4 Always include the source name for each knowledge you use in the answer.
+        #5 Don't cite knowledge that is not available in the knowledge list.
+        #6 If you cannot answer using the knowledge list only, say you don't know.
 
-        You have this knowledge available: {Knowledge}
+        ### KNOWLEDGE BEGIN
+        {Knowledge}
+        ### KNOWLEDGE END
+
+        #7 These are examples of how to answer questions:
 
         ### EXAMPLE 1
         Question: 'What Microsoft Blazor?'
@@ -303,20 +304,22 @@
         #Article: Blazor One #Article Contents: Both client and server code is written in C#, allowing you to share code and libraries.
         #Article: Blazor Two #Article Contents: It uses C# instead of JavaScript allowing you to share code and libraries.
 
-        ##Answer:
-        Blazor apps are composed of reusable web UI components implemented using C#, HTML, and CSS.
-        Both client and server code is written in C#, allowing you to share code and libraries.
+        ##Answer BEGIN ##
+        Blazor apps are composed of reusable web UI components implemented using **C#**, **HTML**, and **CSS**.
+        Both client and server code is written in **C#**, allowing you to share code and libraries.
 
         References: [Blazor One], [Blazor Two]
+        ##Answer END ##
 
         ### EXAMPLE 2
         Question: 'What happens in a performance review'
 
         ##Knowledge:
 
-        ##Answer:
-        I don't know
-        ###";
+        ##Answer BEGIN ##
+        I don't know the answer to this question.
+        ##Answer END ##
+        ";
         return instruction.Trim();
     }    
 }
